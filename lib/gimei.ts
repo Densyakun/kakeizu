@@ -19262,8 +19262,8 @@ var gimei = (function () {
       this.gender = gender;
       this.firstNames = this.names['first_name'][this.gender];
       this.lastNames = this.names['last_name'];
-      this.firstNamesIndex = Math.ceil(Math.random() * this.firstNames.length);
-      this.lastNamesIndex = Math.ceil(Math.random() * this.lastNames.length);
+      this.firstNamesIndex = Math.floor(Math.random() * this.firstNames.length);
+      this.lastNamesIndex = Math.floor(Math.random() * this.lastNames.length);
       return this;
     },
 
@@ -19341,9 +19341,9 @@ var gimei = (function () {
       this.prefectures = this.addresses['prefecture'];
       this.cities = this.addresses['city'];
       this.towns = this.addresses['town'];
-      this.prefectureIndex = Math.ceil(Math.random() * this.prefectures.length);
-      this.cityIndex = Math.ceil(Math.random() * this.cities.length);
-      this.townIndex = Math.ceil(Math.random() * this.towns.length);
+      this.prefectureIndex = Math.floor(Math.random() * this.prefectures.length);
+      this.cityIndex = Math.floor(Math.random() * this.cities.length);
+      this.townIndex = Math.floor(Math.random() * this.towns.length);
       return this;
     },
 
@@ -19422,7 +19422,7 @@ var gimei = (function () {
       if (this.nameObj === null) {
         this.nameObj = name
           .setNames(names)
-          .setGender(Math.round(Math.random() + 1) === 1 ? 'male' : 'female');
+          .setGender(Math.floor(Math.random() * 2) ? 'male' : 'female');
       }
       return this.nameObj;
     },

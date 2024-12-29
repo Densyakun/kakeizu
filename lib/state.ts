@@ -1,5 +1,5 @@
 import { proxy } from "valtio";
-import { createTestTree } from "./tree";
+import { createTestTree } from "./testTree";
 
 export const state = proxy({
   tree: createTestTree(),

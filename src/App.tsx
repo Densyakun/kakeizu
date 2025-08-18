@@ -1,6 +1,6 @@
 import { Container } from '@mui/material'
 import './App.css'
-import { Tree } from './components/Tree'
+import Tree from './components/Tree'
 
 function App() {
   return (

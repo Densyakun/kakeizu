@@ -17,3 +17,15 @@ export type PersonType = {
 export function getPersonById(tree: FamilyTreeType, id: string) {
   return tree.people.find(person => person.id === id);
 }
+
+export function getDisplayNameText(person: PersonType) {
+  return !person.lastName && !person.firstName
+    ? getDisplayKanaNameText(person) || undefined
+    : (person.lastName ?? "") + (person.lastName && person.firstName ? "　" : "") + (person.firstName ?? "");
+}
+
+export function getDisplayKanaNameText(person: PersonType) {
+  return !person.lastNameKana && !person.firstNameKana
+    ? undefined
+    : (person.lastNameKana ?? "") + (person.lastNameKana && person.firstNameKana ? "　" : "") + (person.firstNameKana ?? "");
+}

@@ -4,19 +4,12 @@
   font-style: normal;
 }
 
-.couple {
-  display: inline-block;
-  position: relative;
-  width: 32px;
-}
-
-.couple:after {
-  content: '';
-  position: absolute;
-  height: 1px;
-  width: 48px;
-  top: 0px;
-  left: -8px;
-  border-top: solid 2px black;
-  border-bottom: solid 2px black;
+.react-flow__node-person {
+  padding: 4px;
+  border-radius: var(--xy-node-border-radius, var(--xy-node-border-radius-default));
+  font-size: 16px;
+  color: var(--xy-node-color, var(--xy-node-color-default));
+  text-align: center;
+  border: var(--xy-node-border, var(--xy-node-border-default));
+  background-color: var(--xy-node-background-color, var(--xy-node-background-color-default));
 }

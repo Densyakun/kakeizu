@@ -56,8 +56,13 @@ export function createTestPeople(): PersonType[] {
       person.lastNameKana = "チョクシカワハラ";
       person.firstNameKana = "サエモンサブロウ";
     } else if (index === 4) {
+      person.isMan = true;
+
       person.lastName = "Smith";
       person.firstName = "James";
+
+      person.lastNameKana = "スミス";
+      person.firstNameKana = "ジェームズ";
     }
 
     people.push(person);

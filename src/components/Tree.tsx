@@ -1,11 +1,12 @@
 import Dagre from '@dagrejs/dagre';
 import { state } from '@/lib/state';
 import { FamilyTreeType, getDisplayKanaNameText, getDisplayNameText, PersonType } from '@/lib/tree';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { ReactFlow, type Node, type Edge, Panel, ReactFlowProvider, useNodesState, useEdgesState, Background, Controls, type NodeProps, Handle, Position } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useSnapshot } from 'valtio';
 import { Box, Button, Stack, Tooltip } from '@mui/material';
+import MarriageEdge from './MarriageEdge';
 
 const nodeWidth = 36;
 const nodeHeight = 172;
@@ -41,12 +42,20 @@ const PersonNode = ({ data }: NodeProps) => {
       </Box>
       <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: 'none' }} />
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: 'none' }} />
+      <Handle type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: 'none' }} id="left" />
+      <Handle type="target" position={Position.Right} style={{ opacity: 0, pointerEvents: 'none' }} id="right" />
+      <Handle type="source" position={Position.Left} style={{ opacity: 0, pointerEvents: 'none' }} id="left" />
+      <Handle type="source" position={Position.Right} style={{ opacity: 0, pointerEvents: 'none' }} id="right" />
     </Box>
   </Tooltip>;
 };
 
 const nodeTypes = {
   person: PersonNode,
+};
+
+const edgeTypes = {
+  marriage: MarriageEdge,
 };
 
 function createInitialFlow(tree: FamilyTreeType): [Node[], Edge[]] {
@@ -79,6 +88,16 @@ function createInitialFlow(tree: FamilyTreeType): [Node[], Edge[]] {
         target: person.id,
         type: 'step',
       });
+
+    if (person.spouseId && person.isMan)
+      initialEdges.push({
+        id: `${person.id}-${person.spouseId}`,
+        source: person.id,
+        sourceHandle: 'left',
+        target: person.spouseId,
+        targetHandle: 'right',
+        type: 'marriage',
+      });
   });
 
   return [initialNodes, initialEdges];
@@ -90,11 +109,7 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], options: { direction:
 
   edges.forEach((edge) => g.setEdge(edge.source, edge.target));
   nodes.forEach((node) =>
-    g.setNode(node.id, {
-      ...node,
-      width: nodeWidth,
-      height: nodeHeight,
-    }),
+    g.setNode(node.id, node),
   );
 
   Dagre.layout(g);
@@ -119,6 +134,11 @@ const LayoutFlow = () => {
   const [nodes, setNodes] = useNodesState(initialNodes);
   const [edges, setEdges] = useEdgesState(initialEdges);
 
+  useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [tree]);
+
   const onLayout = useCallback(
     (direction: string) => {
       const layouted = getLayoutedElements(nodes, edges, { direction });
@@ -134,6 +154,7 @@ const LayoutFlow = () => {
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       fitView
     >
       <Background />

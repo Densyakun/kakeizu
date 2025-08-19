@@ -17,6 +17,10 @@ export function createTestTree(): FamilyTreeType {
     }
   }
 
+  // 婚姻関係
+  people[1].spouseId = people[2].id;
+  people[2].spouseId = people[1].id;
+
   return {
     people,
   };
@@ -108,6 +112,7 @@ export function createTestPerson(isMan = Boolean(Math.floor(Math.random() * 2)))
     isMan: isMan,
     fatherId: "",
     motherId: "",
+    spouseId: "",
     description: "",
   };
 

@@ -11,6 +11,7 @@ export type PersonType = {
   isMan?: boolean;
   fatherId: string;
   motherId: string;
+  spouseId: string;
   description: string;
 };
 

@@ -39,8 +39,8 @@ const PersonNode = ({ data }: NodeProps) => {
       }}>
         {getDisplayNameText(person) || "（不明）"}
       </Box>
-      <Handle type="target" position={Position.Top} />
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: 'none' }} />
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: 'none' }} />
     </Box>
   </Tooltip>;
 };

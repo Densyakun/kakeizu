@@ -14,6 +14,7 @@ const elkOptions = {
   'elk.algorithm': 'layered',
   'elk.layered.spacing.nodeNodeBetweenLayers': '100',
   'elk.spacing.nodeNode': '80',
+  'elk.layered.nodePlacement.strategy': 'SIMPLE',
 };
 
 const nodeWidth = 36;
@@ -112,7 +113,31 @@ function createInitialFlow(tree: FamilyTreeType): [Node[], Edge[]] {
 }
 
 const getLayoutedElements = (nodes: Node[], edges: Edge[], options: any = {}) => {
-  // Convert React Flow edges to ELK edges
+  const marriageGroups: { [groupId: string]: any } = {};
+  const usedInMarriage = new Set<string>();
+
+  edges.forEach(edge => {
+    if (edge.type === 'marriage') {
+      const groupId = `marriage-${edge.source}-${edge.target}`;
+      marriageGroups[groupId] = {
+        id: groupId,
+        children: [
+          nodes.find(n => n.id === edge.source),
+          nodes.find(n => n.id === edge.target),
+        ],
+        layoutOptions: { 'elk.groupNode.layout': 'HORIZONTAL' },
+      };
+      usedInMarriage.add(edge.source);
+      usedInMarriage.add(edge.target);
+    }
+  });
+
+  const elkChildren: any[] = [];
+  Object.values(marriageGroups).forEach(group => elkChildren.push(group));
+  nodes.forEach(node => {
+    if (!usedInMarriage.has(node.id)) elkChildren.push(node);
+  });
+
   const elkEdges = edges.map((edge) => ({
     sources: [edge.source],
     targets: [edge.target],
@@ -122,20 +147,29 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], options: any = {}) =>
   const graph = {
     id: 'root',
     layoutOptions: options,
-    children: nodes,
+    children: elkChildren,
     edges: elkEdges,
   };
 
   return elk
     .layout(graph)
     .then((layoutedGraph) => ({
-      nodes: layoutedGraph.children?.map((node) => ({
-        ...node,
-        position: { x: node.x ?? 0, y: node.y ?? 0 },
-        sourcePosition: Position.Bottom,
-        targetPosition: Position.Top,
-      })),
-
+      nodes: layoutedGraph.children?.flatMap((node) => {
+        if (node.children) {
+          return node.children.map((child: any) => ({
+            ...child,
+            position: { x: child.x ?? 0, y: child.y ?? 0 },
+            sourcePosition: Position.Bottom,
+            targetPosition: Position.Top,
+          }));
+        }
+        return {
+          ...node,
+          position: { x: node.x ?? 0, y: node.y ?? 0 },
+          sourcePosition: Position.Bottom,
+          targetPosition: Position.Top,
+        };
+      }),
       edges: layoutedGraph.edges,
     }))
     .catch(console.error);

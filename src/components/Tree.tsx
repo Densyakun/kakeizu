@@ -20,8 +20,10 @@ const elkOptions = {
 const nodeWidth = 36;
 const nodeHeight = 172;
 
-const PersonNode = ({ data }: NodeProps) => {
-  const person: PersonType = (data as any).person;
+type PersonNodeData = { person: PersonType };
+
+const PersonNode = ({ data }: NodeProps & { data: PersonNodeData }) => {
+  const person: PersonType = data.person;
 
   const tooltip: string[] = [];
 
@@ -59,8 +61,16 @@ const PersonNode = ({ data }: NodeProps) => {
   </Tooltip>;
 };
 
+const UnionNode = () => {
+  return <>
+    <Handle type="target" position={Position.Top} style={{ top: 5, opacity: 0, pointerEvents: 'none' }} />
+    <Handle type="source" position={Position.Bottom} style={{ bottom: 5, opacity: 0, pointerEvents: 'none' }} />
+  </>;
+};
+
 const nodeTypes = {
   person: PersonNode,
+  union: UnionNode,
 };
 
 const edgeTypes = {
@@ -69,7 +79,6 @@ const edgeTypes = {
 
 function createInitialFlow(tree: FamilyTreeType): [Node[], Edge[]] {
   const initialNodes: Node[] = [];
-
   const initialEdges: Edge[] = [];
 
   tree.people.forEach(person => {
@@ -81,24 +90,46 @@ function createInitialFlow(tree: FamilyTreeType): [Node[], Edge[]] {
       position: { x: 0, y: 0 },
       data: { person },
     });
+  });
 
-    if (person.fatherId)
-      initialEdges.push({
-        id: `${person.fatherId}-${person.id}`,
-        source: person.fatherId,
-        target: person.id,
-        type: 'step',
-      });
+  tree.people.forEach(person => {
+    // 両親がいる場合は必ず結合ノードを作成（母→父の順）
+    if (person.fatherId && person.motherId) {
+      const unionId = `union-${person.motherId}-${person.fatherId}`;
+      // すでに追加済みでなければ追加
+      if (!initialNodes.find(n => n.id === unionId)) {
+        initialNodes.push({
+          id: unionId,
+          type: 'union',
+          width: 1,
+          height: 1,
+          position: { x: 0, y: 0 },
+          data: {},
+        });
 
-    if (person.motherId)
-      initialEdges.push({
-        id: `${person.motherId}-${person.id}`,
-        source: person.motherId,
-        target: person.id,
-        type: 'step',
-      });
+        // 母から結合ノードへのエッジ
+        initialEdges.push({
+          id: `${person.motherId}-${unionId}`,
+          source: person.motherId,
+          sourceHandle: 'right',
+          target: unionId,
+          type: 'step',
+        });
+        // 父から結合ノードへのエッジ
+        initialEdges.push({
+          id: `${person.fatherId}-${unionId}`,
+          source: person.fatherId,
+          sourceHandle: 'left',
+          target: unionId,
+          type: 'step',
+        });
+      }
+    }
+  });
 
-    if (person.spouseId && !person.isMan)
+  // 夫婦ペアにmarriageエッジを追加（妻側からのみ）
+  tree.people.forEach(person => {
+    if (person.spouseId && !person.isMan) {
       initialEdges.push({
         id: `${person.id}-${person.spouseId}`,
         source: person.id,
@@ -107,35 +138,87 @@ function createInitialFlow(tree: FamilyTreeType): [Node[], Edge[]] {
         targetHandle: 'left',
         type: 'marriage',
       });
+    }
+  });
+
+  // 子→結合ノードへのエッジ
+  tree.people.forEach(person => {
+    if (person.fatherId && person.motherId) {
+      const unionId = `union-${person.motherId}-${person.fatherId}`;
+      initialEdges.push({
+        id: `${unionId}-${person.id}`,
+        source: unionId,
+        target: person.id,
+        type: 'step',
+      });
+    }
   });
 
   return [initialNodes, initialEdges];
 }
 
 const getLayoutedElements = (nodes: Node[], edges: Edge[], options: any = {}) => {
-  const marriageGroups: { [groupId: string]: any } = {};
-  const usedInMarriage = new Set<string>();
+  const parentGroups: any[] = [];
+  const spouseGroups: any[] = [];
 
+  // 子ごとに父母グループを作成（母→父の順）
+  edges.forEach(edge => {
+    if (edge.source.startsWith('union-')) {
+      const [_, motherId, fatherId] = edge.source.split('-');
+      const motherNode = nodes.find(n => n.id === motherId);
+      const fatherNode = nodes.find(n => n.id === fatherId);
+
+      if (motherNode && fatherNode) {
+        parentGroups.push({
+          id: `parentgroup-${motherId}-${fatherId}-${edge.target}`,
+          groupType: 'parent',
+          children: [motherNode, fatherNode],
+          width: nodeWidth * 2,
+          height: nodeHeight,
+          layoutOptions: { 'elk.groupNode.layout': 'HORIZONTAL' },
+        });
+      }
+    }
+  });
+
+  // 配偶者グループ（夫婦のみ、子がいなくてもグループ化）
   edges.forEach(edge => {
     if (edge.type === 'marriage') {
-      const groupId = `marriage-${edge.source}-${edge.target}`;
-      marriageGroups[groupId] = {
-        id: groupId,
-        children: [
-          nodes.find(n => n.id === edge.source),
-          nodes.find(n => n.id === edge.target),
-        ],
-        layoutOptions: { 'elk.groupNode.layout': 'HORIZONTAL' },
-      };
-      usedInMarriage.add(edge.source);
-      usedInMarriage.add(edge.target);
+      const wifeNode = nodes.find(n => !(n.data as PersonNodeData).person.isMan && n.id === edge.source);
+      const husbandNode = nodes.find(n => (n.data as PersonNodeData).person.isMan && n.id === edge.target);
+      if (wifeNode && husbandNode) {
+        spouseGroups.push({
+          id: `spousegroup-${wifeNode.id}-${husbandNode.id}`,
+          groupType: 'spouse',
+          children: [wifeNode, husbandNode], // 妻→夫の順
+          width: nodeWidth * 2,
+          height: nodeHeight,
+          layoutOptions: { 'elk.groupNode.layout': 'HORIZONTAL' },
+        });
+      }
     }
   });
 
   const elkChildren: any[] = [];
-  Object.values(marriageGroups).forEach(group => elkChildren.push(group));
+  parentGroups.forEach(group => elkChildren.push(group));
+  spouseGroups.forEach(group => elkChildren.push(group));
+
+  // グループに含まれていないノード（personノードやunionノード）を追加
+  const groupedNodeIds = new Set<string>();
+  [...parentGroups, ...spouseGroups].forEach(group => {
+    group.children.forEach((child: any) => {
+      if (child?.id) groupedNodeIds.add(child.id);
+    });
+  });
+
   nodes.forEach(node => {
-    if (!usedInMarriage.has(node.id)) elkChildren.push(node);
+    if (!groupedNodeIds.has(node.id)) {
+      elkChildren.push({
+        ...node,
+        width: node.width ?? nodeWidth,
+        height: node.height ?? nodeHeight,
+      });
+    }
   });
 
   const elkEdges = edges.map((edge) => ({
@@ -155,14 +238,14 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], options: any = {}) =>
     .layout(graph)
     .then((layoutedGraph) => ({
       nodes: layoutedGraph.children?.flatMap((node) => {
-        if (node.children) {
+        if (node.children)
           return node.children.map((child: any) => ({
             ...child,
             position: { x: child.x ?? 0, y: child.y ?? 0 },
             sourcePosition: Position.Bottom,
             targetPosition: Position.Top,
           }));
-        }
+
         return {
           ...node,
           position: { x: node.x ?? 0, y: node.y ?? 0 },

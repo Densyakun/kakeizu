@@ -1,12 +1,20 @@
-import Dagre from '@dagrejs/dagre';
+import ELK from 'elkjs/lib/elk.bundled.js';
 import { state } from '@/lib/state';
 import { FamilyTreeType, getDisplayKanaNameText, getDisplayNameText, PersonType } from '@/lib/tree';
-import { useCallback, useEffect } from 'react';
-import { ReactFlow, type Node, type Edge, Panel, ReactFlowProvider, useNodesState, useEdgesState, Background, Controls, type NodeProps, Handle, Position } from '@xyflow/react';
+import { useCallback, useLayoutEffect } from 'react';
+import { ReactFlow, type Node, type Edge, Panel, ReactFlowProvider, useNodesState, useEdgesState, Background, Controls, type NodeProps, Handle, Position, useReactFlow, addEdge } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useSnapshot } from 'valtio';
 import { Box, Button, Stack, Tooltip } from '@mui/material';
 import MarriageEdge from './MarriageEdge';
+
+const elk = new ELK();
+
+const elkOptions = {
+  'elk.algorithm': 'layered',
+  'elk.layered.spacing.nodeNodeBetweenLayers': '100',
+  'elk.spacing.nodeNode': '80',
+};
 
 const nodeWidth = 36;
 const nodeHeight = 172;
@@ -103,56 +111,84 @@ function createInitialFlow(tree: FamilyTreeType): [Node[], Edge[]] {
   return [initialNodes, initialEdges];
 }
 
-const getLayoutedElements = (nodes: Node[], edges: Edge[], options: { direction: string }) => {
-  const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: options.direction });
+const getLayoutedElements = (nodes: Node[], edges: Edge[], options: any = {}) => {
+  // Convert React Flow edges to ELK edges
+  const elkEdges = edges.map((edge) => ({
+    sources: [edge.source],
+    targets: [edge.target],
+    ...edge,
+  }));
 
-  edges.forEach((edge) => g.setEdge(edge.source, edge.target));
-  nodes.forEach((node) =>
-    g.setNode(node.id, node),
-  );
-
-  Dagre.layout(g);
-
-  return {
-    nodes: nodes.map((node) => {
-      const position = g.node(node.id);
-      const x = position.x - (node.measured?.width ?? 0) / 2;
-      const y = position.y - (node.measured?.height ?? 0) / 2;
-
-      return { ...node, position: { x, y } };
-    }),
-    edges,
+  const graph = {
+    id: 'root',
+    layoutOptions: options,
+    children: nodes,
+    edges: elkEdges,
   };
+
+  return elk
+    .layout(graph)
+    .then((layoutedGraph) => ({
+      nodes: layoutedGraph.children?.map((node) => ({
+        ...node,
+        position: { x: node.x ?? 0, y: node.y ?? 0 },
+        sourcePosition: Position.Bottom,
+        targetPosition: Position.Top,
+      })),
+
+      edges: layoutedGraph.edges,
+    }))
+    .catch(console.error);
 };
 
 const LayoutFlow = () => {
   const { tree } = useSnapshot(state);
+  const [initialNodes, initialEdges] = createInitialFlow(tree as FamilyTreeType);
 
-  const { nodes: initialNodes, edges: initialEdges } = getLayoutedElements(...createInitialFlow(tree as FamilyTreeType), { direction: 'TB' });
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const { fitView } = useReactFlow();
 
-  const [nodes, setNodes] = useNodesState(initialNodes);
-  const [edges, setEdges] = useEdgesState(initialEdges);
-
-  useEffect(() => {
-    setNodes(initialNodes);
-    setEdges(initialEdges);
-  }, [tree]);
-
+  const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), []);
   const onLayout = useCallback(
-    (direction: string) => {
-      const layouted = getLayoutedElements(nodes, edges, { direction });
+    ({ direction, useInitialNodes = false }: { direction: string, useInitialNodes?: boolean }) => {
+      const opts = { 'elk.direction': direction, ...elkOptions };
+      const ns = useInitialNodes ? initialNodes : nodes;
+      const es = useInitialNodes ? initialEdges : edges;
 
-      setNodes([...layouted.nodes]);
-      setEdges([...layouted.edges]);
+      getLayoutedElements(ns, es, opts).then((result) => {
+        if (result && result.nodes && result.edges) {
+          setNodes(result.nodes);
+          setEdges(
+            result.edges.map((edge: any) => ({
+              id: edge.id,
+              source: edge.source,
+              target: edge.target,
+              sourceHandle: edge.sourceHandle,
+              targetHandle: edge.targetHandle,
+              type: edge.type,
+              ...edge,
+            }))
+          );
+          fitView();
+        }
+      });
     },
     [nodes, edges],
   );
+
+  // Calculate the initial layout on mount.
+  useLayoutEffect(() => {
+    onLayout({ direction: 'DOWN', useInitialNodes: true });
+  }, []);
 
   return (
     <ReactFlow
       nodes={nodes}
       edges={edges}
+      onConnect={onConnect}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       fitView
@@ -161,8 +197,8 @@ const LayoutFlow = () => {
       <Controls />
       <Panel position="top-right">
         <Stack direction="row" spacing={1}>
-          <Button variant='outlined' onClick={() => onLayout('TB')}>vertical layout</Button>
-          {/*<Button variant='outlined' onClick={() => onLayout('LR')}>horizontal layout</Button>*/}
+          <Button variant='outlined' onClick={() => onLayout({ direction: 'DOWN' })}>vertical layout</Button>
+          {/*<Button variant='outlined' onClick={() => onLayout({ direction: 'RIGHT' })}>horizontal layout</Button>*/}
         </Stack>
       </Panel>
     </ReactFlow>

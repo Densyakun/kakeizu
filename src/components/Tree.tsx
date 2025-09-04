@@ -98,13 +98,13 @@ function createInitialFlow(tree: FamilyTreeType): [Node[], Edge[]] {
         type: 'step',
       });
 
-    if (person.spouseId && person.isMan)
+    if (person.spouseId && !person.isMan)
       initialEdges.push({
         id: `${person.id}-${person.spouseId}`,
         source: person.id,
-        sourceHandle: 'left',
+        sourceHandle: 'right',
         target: person.spouseId,
-        targetHandle: 'right',
+        targetHandle: 'left',
         type: 'marriage',
       });
   });
